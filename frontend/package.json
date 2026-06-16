@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "Lodestar — on-chain service discovery for x402 AI agents",
   "private": true,
-  "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest"
   },
   "dependencies": {
     "@creit-tech/stellar-wallets-kit": "npm:@jsr/creit-tech__stellar-wallets-kit@^2.1.0",
