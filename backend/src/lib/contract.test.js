@@ -102,7 +102,7 @@ describe('mapAgent', () => {
     expect(result.last_active).toBe(Number.MAX_SAFE_INTEGER);
   });
 
-  it('should handle values exceeding Number.MAX_SAFE_INTEGER for volume fields', () => {
+  it('should handle values exceeding Number.MAX_SAFE_INTEGER', () => {
     const large = BigInt(Number.MAX_SAFE_INTEGER) * 2n;
     const raw = {
       address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
@@ -124,7 +124,84 @@ describe('mapAgent', () => {
     const result = mapAgent(raw);
 
     expect(result.total_volume_stroops).toBe(large.toString());
-    expect(result.score).toBe(Number(large));
+    expect(result.score).toBe(large.toString());
+    expect(result.total_payments).toBe(large.toString());
+    expect(result.successful_payments).toBe(large.toString());
+    expect(result.failed_payments).toBe(large.toString());
+    expect(result.registered_at).toBe(large.toString());
+    expect(result.last_active).toBe(large.toString());
+  });
+
+  it('should handle negative i128 values', () => {
+    const raw = {
+      address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
+      name: 'Negative Agent',
+      description: 'Negative scores',
+      owner: 'GBV4ZDEPLQTVPQFJRME2BGYL6VQJLTTRIWJHTJNFGXBVF4WY5DJIQK2K',
+      score: -50n,
+      total_payments: 10n,
+      successful_payments: 5n,
+      failed_payments: 5n,
+      total_volume_stroops: 0n,
+      registered_at: 0n,
+      last_active: 0n,
+      active: true,
+      flagged: false,
+      flag_reason: '',
+    };
+
+    const result = mapAgent(raw);
+
+    expect(result.score).toBe(-50);
+    expect(result.total_payments).toBe(10);
+  });
+
+  it('should handle values at Number.MIN_SAFE_INTEGER', () => {
+    const minSafe = BigInt(Number.MIN_SAFE_INTEGER);
+    const raw = {
+      address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
+      name: 'Min Safe Agent',
+      description: 'At min safe integer',
+      owner: 'GBV4ZDEPLQTVPQFJRME2BGYL6VQJLTTRIWJHTJNFGXBVF4WY5DJIQK2K',
+      score: minSafe,
+      total_payments: 0n,
+      successful_payments: 0n,
+      failed_payments: 0n,
+      total_volume_stroops: 0n,
+      registered_at: 0n,
+      last_active: 0n,
+      active: true,
+      flagged: false,
+      flag_reason: '',
+    };
+
+    const result = mapAgent(raw);
+
+    expect(result.score).toBe(Number.MIN_SAFE_INTEGER);
+  });
+
+  it('should handle values below Number.MIN_SAFE_INTEGER as string', () => {
+    const belowMin = BigInt(Number.MIN_SAFE_INTEGER) * 2n;
+    const raw = {
+      address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
+      name: 'Below Min Agent',
+      description: 'Below min safe integer',
+      owner: 'GBV4ZDEPLQTVPQFJRME2BGYL6VQJLTTRIWJHTJNFGXBVF4WY5DJIQK2K',
+      score: belowMin,
+      total_payments: 0n,
+      successful_payments: 0n,
+      failed_payments: 0n,
+      total_volume_stroops: 0n,
+      registered_at: 0n,
+      last_active: 0n,
+      active: true,
+      flagged: false,
+      flag_reason: '',
+    };
+
+    const result = mapAgent(raw);
+
+    expect(result.score).toBe(belowMin.toString());
   });
 
   it('should handle Address-like objects with toString', () => {
@@ -217,7 +294,7 @@ describe('mapPolicy', () => {
     expect(result.last_reset_ledger).toBe(Number.MAX_SAFE_INTEGER);
   });
 
-  it('should handle values exceeding Number.MAX_SAFE_INTEGER for stroop fields', () => {
+  it('should handle values exceeding Number.MAX_SAFE_INTEGER', () => {
     const large = BigInt(Number.MAX_SAFE_INTEGER) * 10n;
     const raw = {
       agent_address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
@@ -234,6 +311,59 @@ describe('mapPolicy', () => {
     expect(result.max_per_tx_stroops).toBe(large.toString());
     expect(result.max_per_day_stroops).toBe(large.toString());
     expect(result.daily_spent_stroops).toBe(large.toString());
+    expect(result.min_score_to_earn).toBe(large.toString());
+    expect(result.last_reset_ledger).toBe(large.toString());
+  });
+
+  it('should handle negative i128 values', () => {
+    const raw = {
+      agent_address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
+      max_per_tx_stroops: 10000000n,
+      max_per_day_stroops: 50000000n,
+      allowed_categories: ['weather'],
+      min_score_to_earn: -100n,
+      daily_spent_stroops: 0n,
+      last_reset_ledger: 1000n,
+    };
+
+    const result = mapPolicy(raw);
+
+    expect(result.min_score_to_earn).toBe(-100);
+  });
+
+  it('should handle values at Number.MIN_SAFE_INTEGER', () => {
+    const minSafe = BigInt(Number.MIN_SAFE_INTEGER);
+    const raw = {
+      agent_address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
+      max_per_tx_stroops: 0n,
+      max_per_day_stroops: 0n,
+      allowed_categories: [],
+      min_score_to_earn: minSafe,
+      daily_spent_stroops: 0n,
+      last_reset_ledger: 0n,
+    };
+
+    const result = mapPolicy(raw);
+
+    expect(result.min_score_to_earn).toBe(Number.MIN_SAFE_INTEGER);
+  });
+
+  it('should handle values below Number.MIN_SAFE_INTEGER as string', () => {
+    const belowMin = BigInt(Number.MIN_SAFE_INTEGER) * 2n;
+    const raw = {
+      agent_address: 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ',
+      max_per_tx_stroops: 0n,
+      max_per_day_stroops: 0n,
+      allowed_categories: [],
+      min_score_to_earn: belowMin,
+      daily_spent_stroops: 0n,
+      last_reset_ledger: belowMin,
+    };
+
+    const result = mapPolicy(raw);
+
+    expect(result.min_score_to_earn).toBe(belowMin.toString());
+    expect(result.last_reset_ledger).toBe(belowMin.toString());
   });
 
   it('should handle object-like addresses', () => {

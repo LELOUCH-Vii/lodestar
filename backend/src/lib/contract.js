@@ -234,19 +234,31 @@ export async function registerServiceOnChain(
 
 // ── Agent Credit Scoring ──────────────────────────────────────────────────────
 
+/**
+ * Safely convert a BigInt (or other value) to a Number.
+ * Falls back to String for values outside the safe integer range
+ * to prevent silent precision loss on i128/u64 values.
+ */
+function toNumber(value) {
+  if (typeof value === 'bigint' && (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER))) {
+    return value.toString();
+  }
+  return Number(value);
+}
+
 export function mapAgent(raw) {
   return {
     address: raw.address?.toString() ?? raw.address,
     name: raw.name,
     description: raw.description,
     owner: raw.owner?.toString() ?? raw.owner,
-    score: Number(raw.score),
-    total_payments: Number(raw.total_payments),
-    successful_payments: Number(raw.successful_payments),
-    failed_payments: Number(raw.failed_payments),
+    score: toNumber(raw.score),
+    total_payments: toNumber(raw.total_payments),
+    successful_payments: toNumber(raw.successful_payments),
+    failed_payments: toNumber(raw.failed_payments),
     total_volume_stroops: String(raw.total_volume_stroops),
-    registered_at: Number(raw.registered_at),
-    last_active: Number(raw.last_active),
+    registered_at: toNumber(raw.registered_at),
+    last_active: toNumber(raw.last_active),
     active: raw.active,
     flagged: raw.flagged,
     flag_reason: raw.flag_reason ?? '',
@@ -259,9 +271,9 @@ export function mapPolicy(raw) {
     max_per_tx_stroops: String(raw.max_per_tx_stroops),
     max_per_day_stroops: String(raw.max_per_day_stroops),
     allowed_categories: Array.isArray(raw.allowed_categories) ? raw.allowed_categories : [],
-    min_score_to_earn: Number(raw.min_score_to_earn),
+    min_score_to_earn: toNumber(raw.min_score_to_earn),
     daily_spent_stroops: String(raw.daily_spent_stroops),
-    last_reset_ledger: Number(raw.last_reset_ledger),
+    last_reset_ledger: toNumber(raw.last_reset_ledger),
   };
 }
 
