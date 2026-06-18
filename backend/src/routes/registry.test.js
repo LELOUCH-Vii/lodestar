@@ -3,9 +3,16 @@ import express from 'express';
 import request from 'supertest';
 
 const mockListServices = vi.fn();
+const mockGetService = vi.fn();
+const mockGetReputationHistory = vi.fn();
 
 vi.mock('../lib/contract.js', () => ({
   listServices: (...args) => mockListServices(...args),
+  getService: (...args) => mockGetService(...args),
+}));
+
+vi.mock('../lib/reputationHistory.js', () => ({
+  getReputationHistory: (...args) => mockGetReputationHistory(...args),
 }));
 
 vi.mock('../lib/logger.js', () => ({
@@ -212,5 +219,56 @@ describe('POST /api/reputation/:id — request body size limit', () => {
       .send({ positive: true });
 
     expect(res.status).not.toBe(413);
+  });
+});
+
+describe('GET /api/services/:id/history', () => {
+  it('should return empty history for a service with no changes', async () => {
+    mockGetService.mockResolvedValueOnce(makeService({ id: 1 }));
+    mockGetReputationHistory.mockReturnValueOnce([]);
+
+    const res = await request(app).get('/api/services/1/history');
+
+    expect(res.status).toBe(200);
+    expect(res.body.history).toEqual([]);
+  });
+
+  it('should return history for a service with changes', async () => {
+    const history = [
+      { timestamp: 1718170000000, delta: 1, newValue: 1 },
+      { timestamp: 1718170100000, delta: 1, newValue: 2 },
+    ];
+    mockGetService.mockResolvedValueOnce(makeService({ id: 1 }));
+    mockGetReputationHistory.mockReturnValueOnce(history);
+
+    const res = await request(app).get('/api/services/1/history');
+
+    expect(res.status).toBe(200);
+    expect(res.body.history).toEqual(history);
+  });
+
+  it('should return 400 for invalid service ID', async () => {
+    const res = await request(app).get('/api/services/invalid/history');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid service ID');
+  });
+
+  it('should return 404 if service does not exist', async () => {
+    mockGetService.mockResolvedValueOnce(null);
+
+    const res = await request(app).get('/api/services/999/history');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Service not found');
+  });
+
+  it('should return 500 when contract call fails', async () => {
+    mockGetService.mockRejectedValueOnce(new Error('Chain error'));
+
+    const res = await request(app).get('/api/services/1/history');
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to fetch reputation history', code: 'FETCH_ERROR' });
   });
 });

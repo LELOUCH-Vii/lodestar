@@ -5,6 +5,7 @@ import {
   getServiceCount,
   updateReputation,
 } from '../lib/contract.js';
+import { getReputationHistory } from '../lib/reputationHistory.js';
 import logger from '../lib/logger.js';
 
 const router = Router();
@@ -44,6 +45,24 @@ router.get('/services/:id', async (req, res) => {
   } catch (err) {
     logger.error({ err, id: req.params.id }, 'GET /api/services/:id failed');
     res.status(500).json({ error: 'Failed to fetch service', code: 'FETCH_ERROR' });
+  }
+});
+
+router.get('/services/:id/history', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ error: 'Invalid service ID', code: 'INVALID_ID' });
+    }
+    const service = await getService(id);
+    if (!service) {
+      return res.status(404).json({ error: 'Service not found', code: 'NOT_FOUND' });
+    }
+    const history = getReputationHistory(id);
+    res.json({ history });
+  } catch (err) {
+    logger.error({ err, id: req.params.id }, 'GET /api/services/:id/history failed');
+    res.status(500).json({ error: 'Failed to fetch reputation history', code: 'FETCH_ERROR' });
   }
 });
 

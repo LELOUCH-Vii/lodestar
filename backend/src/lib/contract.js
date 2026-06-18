@@ -13,6 +13,7 @@ const {
 import config from '../config.js';
 import { getStellarServer, getNetworkPassphrase } from './stellar.js';
 import logger from './logger.js';
+import { recordReputationChange } from './reputationHistory.js';
 
 const TIMEOUT = 30;
 
@@ -184,8 +185,20 @@ export async function getServiceCount() {
   }
 }
 
+/**
+ * Update a service's reputation on-chain and record the change history.
+ * @param {number} id - The ID of the service to update
+ * @param {boolean} positive - Whether to increase (true) or decrease (false) reputation by 1
+ * @returns {Promise<number>} The new reputation value
+ * @throws {Error} If the contract call fails or service can't be read
+ */
 export async function updateReputation(id, positive) {
   try {
+    const before = await getService(id);
+    if (!before) {
+      throw new Error(`Service ${id} not found before reputation update`);
+    }
+
     const contract = getContract();
     const op = contract.call(
       'update_reputation',
@@ -193,8 +206,18 @@ export async function updateReputation(id, positive) {
       nativeToScVal(positive, { type: 'bool' })
     );
     await simulateAndSubmit(op);
-    const updated = await getService(id);
-    return updated?.reputation ?? 0;
+    
+    const after = await getService(id);
+    if (!after) {
+      throw new Error(`Failed to read updated reputation for service ${id}`);
+    }
+
+    const newReputation = after.reputation;
+    const delta = newReputation - before.reputation;
+
+    recordReputationChange(id, Date.now(), delta, newReputation);
+
+    return newReputation;
   } catch (err) {
     logger.error({ err, id, positive }, 'updateReputation failed');
     throw err;
