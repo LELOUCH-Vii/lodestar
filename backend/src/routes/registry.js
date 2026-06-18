@@ -4,14 +4,24 @@ import {
   getService,
   getServiceCount,
   updateReputation,
-
+} from "../lib/contract.js";
+import { getReputationHistory } from "../lib/reputationHistory.js";
+import logger from "../lib/logger.js";
+import { ContractError } from "../lib/ContractError.js";
 
 const router = Router();
 
+const PAGE_SIZE = 20;
+
 router.get("/services", async (req, res) => {
   try {
-    const { category, q } = req.query;
-    let services = await listServices(category || undefined);
+    const { category, q, page: pageStr } = req.query;
+    const page = Math.max(0, parseInt(pageStr, 10) || 0);
+    let services = await listServices({
+      category: category || undefined,
+      page,
+      pageSize: PAGE_SIZE,
+    });
 
     if (q && typeof q === "string" && q.trim()) {
       const query = q.trim().toLowerCase();
@@ -24,7 +34,16 @@ router.get("/services", async (req, res) => {
 
     res.json({ services, count: services.length });
   } catch (err) {
-
+    if (err instanceof ContractError) {
+      if (err.code === "SIMULATION_FAILED") {
+        return res.status(400).json({ error: err.message, code: err.code });
+      }
+      if (err.code === "TRANSACTION_TIMEOUT") {
+        return res.status(504).json({ error: err.message, code: err.code });
+      }
+    }
+    logger.error({ err }, "GET /api/services failed");
+    res.status(500).json({ error: "Failed to fetch services", code: "FETCH_ERROR" });
   }
 });
 
@@ -44,19 +63,46 @@ router.get("/services/:id", async (req, res) => {
     }
     res.json(service);
   } catch (err) {
+    logger.error({ err }, "GET /api/services/:id failed");
+    res.status(500).json({ error: "Failed to fetch service", code: "FETCH_ERROR" });
+  }
+});
 
+router.get("/services/:id/history", async (req, res) => {
+  let id;
+  try {
+    id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return res
+        .status(400)
+        .json({ error: "Invalid service ID", code: "INVALID_ID" });
+    }
+    const service = await getService(id);
+    if (!service) {
+      return res
+        .status(404)
+        .json({ error: "Service not found", code: "NOT_FOUND" });
+    }
+    const history = getReputationHistory(id);
+    res.json({ history });
+  } catch (err) {
+    logger.error({ err, id }, "GET /api/services/:id/history failed");
+    res.status(500).json({ error: "Failed to fetch reputation history", code: "FETCH_ERROR" });
   }
 });
 
 router.get("/stats", async (req, res) => {
   try {
-    const [services, totalServices] = await Promise.all([
-      listServices(),
-      getServiceCount(),
-    ]);
+    const totalServices = await getServiceCount();
+    const totalPages = Math.ceil(totalServices / PAGE_SIZE);
+    let allServices = [];
+    for (let i = 0; i < totalPages; i++) {
+      const page = await listServices({ page: i, pageSize: PAGE_SIZE });
+      allServices.push(...page);
+    }
 
-    const categories = [...new Set(services.map((s) => s.category))];
-    const latestService = services.reduce(
+    const categories = [...new Set(allServices.map((s) => s.category))];
+    const latestService = allServices.reduce(
       (latest, s) =>
         s.registered_at > (latest?.registered_at ?? 0) ? s : latest,
       null,
@@ -64,13 +110,15 @@ router.get("/stats", async (req, res) => {
 
     res.json({ totalServices, categories, latestService });
   } catch (err) {
-
+    logger.error({ err }, "GET /api/stats failed");
+    res.status(500).json({ error: "Failed to fetch stats", code: "FETCH_ERROR" });
   }
 });
 
 router.post("/reputation/:id", async (req, res) => {
+  let id;
   try {
-    const id = parseInt(req.params.id, 10);
+    id = parseInt(req.params.id, 10);
     if (isNaN(id) || id < 1) {
       return res
         .status(400)
@@ -87,12 +135,14 @@ router.post("/reputation/:id", async (req, res) => {
     const newReputation = await updateReputation(id, positive);
     res.json({ success: true, newReputation });
   } catch (err) {
-
+    logger.error({ err, id }, "POST /api/reputation/:id failed");
+    res.status(500).json({ error: "Failed to update reputation", code: "UPDATE_ERROR" });
   }
 });
 
 router.get("/health", async (req, res) => {
   const { default: config } = await import("../config.js");
+  const { checkRpcHealth } = await import("../lib/stellar.js");
   try {
     const health = await checkRpcHealth();
     res.json({

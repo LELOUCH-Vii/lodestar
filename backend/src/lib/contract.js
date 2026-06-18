@@ -113,16 +113,20 @@ async function simulateRead(operation) {
 }
 
 
-export async function listServices(category) {
+export async function listServices({ category, page = 0, pageSize = 20 } = {}) {
   try {
     const contract = getContract();
 
-    // Option<String>: Some(s) = the string value directly; None = scvVoid
     const optionArg = category
       ? nativeToScVal(category, { type: 'string' })
       : xdr.ScVal.scvVoid();
 
-    const callOp = contract.call('list_services', optionArg);
+    const callOp = contract.call(
+      'list_services_page',
+      nativeToScVal(page, { type: 'u32' }),
+      nativeToScVal(pageSize, { type: 'u32' }),
+      optionArg,
+    );
     const retval = await simulateRead(callOp);
     if (!retval) return [];
 

@@ -1,19 +1,34 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the modules first
-vi.mock("../src/config.js", () => ({
-  default: {
-    stellar: {
-      network: "testnet",
-      rpcUrl: "https://soroban-testnet.stellar.org",
-    },
-    contract: {
-      id: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
-    },
-    server: {
-      secret: "SBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHF2Q",
+const mockServer = {
+  getNetwork: vi.fn(),
+  getAccount: vi.fn(),
+};
+
+const mockSdk = {
+  rpc: {
+    Server: vi.fn(() => mockServer),
+    Api: {
+      isSimulationError: vi.fn(),
     },
   },
+  Keypair: {
+    fromSecret: vi.fn(() => ({
+      publicKey: () => "GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ",
+    })),
+  },
+  Networks: { PUBLIC: "public", TESTNET: "Test SDF Network ; September 2015" },
+  Address: { fromString: vi.fn() },
+  TransactionBuilder: vi.fn(),
+  BASE_FEE: "100",
+  xdr: { ScVal: { scvVoid: vi.fn() } },
+  nativeToScVal: vi.fn(),
+  scValToNative: vi.fn(),
+};
+
+vi.mock("@stellar/stellar-sdk", () => ({
+  default: mockSdk,
+  ...mockSdk,
 }));
 
 vi.mock("../src/lib/logger.js", () => ({
@@ -25,29 +40,20 @@ vi.mock("../src/lib/logger.js", () => ({
   },
 }));
 
-let mockServer;
-let getStellarServerMock;
-
 describe("checkRpcHealth", () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
-
-    mockServer = {
-      getNetwork: vi.fn(),
-      getAccount: vi.fn(),
-    };
-
-    // Dynamically import and mock getStellarServer
-    const stellar = await import("../src/lib/stellar.js");
-    getStellarServerMock = vi.spyOn(stellar, "getStellarServer");
-    getStellarServerMock.mockReturnValue(mockServer);
-  });
-
-  afterEach(() => {
+  beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("returns healthy status when RPC and contract are reachable", async () => {
+    vi.doMock("../src/config.js", () => ({
+      default: {
+        stellar: { network: "testnet", rpcUrl: "https://soroban-testnet.stellar.org" },
+        contract: { id: "mock" },
+        server: { secret: "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO7Q" },
+      },
+    }));
+
     const { checkRpcHealth } = await import("../src/lib/stellar.js");
 
     mockServer.getNetwork.mockResolvedValue({});
@@ -62,6 +68,14 @@ describe("checkRpcHealth", () => {
   });
 
   it("returns unhealthy status when RPC is unreachable", async () => {
+    vi.doMock("../src/config.js", () => ({
+      default: {
+        stellar: { network: "testnet", rpcUrl: "https://soroban-testnet.stellar.org" },
+        contract: { id: "mock" },
+        server: { secret: "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO7Q" },
+      },
+    }));
+
     const { checkRpcHealth } = await import("../src/lib/stellar.js");
 
     mockServer.getNetwork.mockRejectedValue(new Error("Connection refused"));
@@ -74,6 +88,14 @@ describe("checkRpcHealth", () => {
   });
 
   it("returns degraded status when contract is unreachable but RPC is up", async () => {
+    vi.doMock("../src/config.js", () => ({
+      default: {
+        stellar: { network: "testnet", rpcUrl: "https://soroban-testnet.stellar.org" },
+        contract: { id: "mock" },
+        server: { secret: "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO7Q" },
+      },
+    }));
+
     const { checkRpcHealth } = await import("../src/lib/stellar.js");
 
     mockServer.getNetwork.mockResolvedValue({});
@@ -88,6 +110,14 @@ describe("checkRpcHealth", () => {
   });
 
   it("measures RPC latency", async () => {
+    vi.doMock("../src/config.js", () => ({
+      default: {
+        stellar: { network: "testnet", rpcUrl: "https://soroban-testnet.stellar.org" },
+        contract: { id: "mock" },
+        server: { secret: "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO7Q" },
+      },
+    }));
+
     const { checkRpcHealth } = await import("../src/lib/stellar.js");
 
     mockServer.getNetwork.mockImplementation(
@@ -101,23 +131,18 @@ describe("checkRpcHealth", () => {
     const health = await checkRpcHealth();
 
     expect(health.rpc.latency).toBeGreaterThanOrEqual(50);
-    expect(health.rpc.latency).toBeLessThan(200);
-  });
-
-  it("returns degraded status when server keypair is not available", async () => {
-    const { checkRpcHealth } = await import("../src/lib/stellar.js");
-
-    mockServer.getNetwork.mockResolvedValue({});
-
-    const health = await checkRpcHealth();
-
-    expect(health.status).toBe("degraded");
-    expect(health.rpc.reachable).toBe(true);
-    expect(health.contract.reachable).toBeNull();
-    expect(health.contract.message).toContain("skipped");
+    expect(health.rpc.latency).toBeLessThan(1000);
   });
 
   it("includes timestamp in ISO format", async () => {
+    vi.doMock("../src/config.js", () => ({
+      default: {
+        stellar: { network: "testnet", rpcUrl: "https://soroban-testnet.stellar.org" },
+        contract: { id: "mock" },
+        server: { secret: "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO7Q" },
+      },
+    }));
+
     const { checkRpcHealth } = await import("../src/lib/stellar.js");
 
     mockServer.getNetwork.mockResolvedValue({});

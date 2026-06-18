@@ -26,6 +26,7 @@ pub enum DataKey {
     Counter,
     ServiceIds,
     Service(u64),
+    ServiceIdsByCategory(String),
 }
 
 #[contract]
@@ -51,6 +52,8 @@ impl LodestarRegistry {
             .unwrap_or(0u64);
 
         let new_id = counter + 1;
+
+        let cat = category.clone();
 
         let entry = ServiceEntry {
             id: new_id,
@@ -92,6 +95,19 @@ impl LodestarRegistry {
             .persistent()
             .extend_ttl(&DataKey::ServiceIds, MAX_TTL, MAX_TTL);
 
+        let mut cat_ids: Vec<u64> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ServiceIdsByCategory(cat.clone()))
+            .unwrap_or_else(|| vec![&env]);
+        cat_ids.push_back(new_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ServiceIdsByCategory(cat.clone()), &cat_ids);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::ServiceIdsByCategory(cat), MAX_TTL, MAX_TTL);
+
         new_id
     }
 
@@ -102,31 +118,43 @@ impl LodestarRegistry {
             .expect("Service not found")
     }
 
-    pub fn list_services(env: Env, category: Option<String>) -> Vec<ServiceEntry> {
-        let ids: Vec<u64> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::ServiceIds)
-            .unwrap_or_else(|| vec![&env]);
+    pub fn list_services_page(
+        env: Env,
+        page: u32,
+        page_size: u32,
+        category: Option<String>,
+    ) -> Vec<ServiceEntry> {
+        let page_size = page_size.min(20u32).max(1u32);
+        let start: u32 = page * page_size;
+
+        let ids: Vec<u64> = if let Some(ref cat) = category {
+            env.storage()
+                .persistent()
+                .get(&DataKey::ServiceIdsByCategory(cat.clone()))
+                .unwrap_or_else(|| vec![&env])
+        } else {
+            env.storage()
+                .persistent()
+                .get(&DataKey::ServiceIds)
+                .unwrap_or_else(|| vec![&env])
+        };
+
+        let total = ids.len();
+        let end = (start + page_size).min(total);
 
         let mut services: Vec<ServiceEntry> = vec![&env];
-
-        for id in ids.iter() {
+        let mut i = start;
+        while i < end {
             if let Some(entry) = env
                 .storage()
                 .persistent()
-                .get::<DataKey, ServiceEntry>(&DataKey::Service(id))
+                .get::<DataKey, ServiceEntry>(&DataKey::Service(ids.get(i).unwrap()))
             {
-                if !entry.active {
-                    continue;
+                if entry.active {
+                    services.push_back(entry);
                 }
-                if let Some(ref cat) = category {
-                    if entry.category != *cat {
-                        continue;
-                    }
-                }
-                services.push_back(entry);
             }
+            i += 1;
         }
 
         // Insertion sort by reputation descending
@@ -187,6 +215,27 @@ impl LodestarRegistry {
         env.storage()
             .persistent()
             .set(&DataKey::Service(id), &entry);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Service(id), MAX_TTL, MAX_TTL);
+
+        // Remove from category index
+        let cat_key = DataKey::ServiceIdsByCategory(entry.category.clone());
+        let cat_ids: Vec<u64> = env
+            .storage()
+            .persistent()
+            .get(&cat_key)
+            .expect("Category index not found");
+        let mut updated: Vec<u64> = vec![&env];
+        for cid in cat_ids.iter() {
+            if cid != id {
+                updated.push_back(cid);
+            }
+        }
+        env.storage().persistent().set(&cat_key, &updated);
+        env.storage()
+            .persistent()
+            .extend_ttl(&cat_key, MAX_TTL, MAX_TTL);
     }
 
     pub fn get_service_count(env: Env) -> u64 {
@@ -203,13 +252,14 @@ mod test {
     use soroban_sdk::{testutils::Address as _, Address, String};
 
     fn setup_service(env: &Env, id: u64, provider: &Address, category: &str, reputation: i32, active: bool) {
+        let cat = String::from_str(env, category);
         let entry = ServiceEntry {
             id,
             name: String::from_str(env, "Test Service"),
             description: String::from_str(env, "Test Description"),
             endpoint: String::from_str(env, "https://test.com"),
             price_usdc: String::from_str(env, "10"),
-            category: String::from_str(env, category),
+            category: cat.clone(),
             provider: provider.clone(),
             reputation,
             active,
@@ -221,6 +271,11 @@ mod test {
         let mut ids: Vec<u64> = env.storage().persistent().get(&DataKey::ServiceIds).unwrap_or_else(|| vec![env]);
         ids.push_back(id);
         env.storage().persistent().set(&DataKey::ServiceIds, &ids);
+
+        // Add to category index
+        let mut cat_ids: Vec<u64> = env.storage().persistent().get(&DataKey::ServiceIdsByCategory(cat.clone())).unwrap_or_else(|| vec![env]);
+        cat_ids.push_back(id);
+        env.storage().persistent().set(&DataKey::ServiceIdsByCategory(cat), &cat_ids);
     }
 
     #[test]
@@ -230,7 +285,7 @@ mod test {
         
         env.clone().as_contract(&contract_id, || {
             // Test with no services registered
-            let result = LodestarRegistry::list_services(env.clone(), None);
+            let result = LodestarRegistry::list_services_page(env.clone(), 0, 20, None);
             assert_eq!(result.len(), 0);
         });
     }
@@ -245,7 +300,7 @@ mod test {
             setup_service(&env, 1, &provider, "compute", 0, true);
 
             // Test listing all services
-            let result = LodestarRegistry::list_services(env, None);
+            let result = LodestarRegistry::list_services_page(env, 0, 20, None);
             assert_eq!(result.len(), 1);
             assert_eq!(result.get(0).unwrap().id, 1);
         });
@@ -265,7 +320,7 @@ mod test {
             setup_service(&env, 3, &provider, "compute", -1, true);
 
             // Test sorting (should be descending: 1=2, 2=1, 3=-1)
-            let result = LodestarRegistry::list_services(env, None);
+            let result = LodestarRegistry::list_services_page(env, 0, 20, None);
             assert_eq!(result.len(), 3);
             assert_eq!(result.get(0).unwrap().id, 1);
             assert_eq!(result.get(1).unwrap().id, 2);
@@ -287,7 +342,7 @@ mod test {
             setup_service(&env, 3, &provider, "compute", 1, true);
 
             // Test that all are returned (order may vary for ties)
-            let result = LodestarRegistry::list_services(env, None);
+            let result = LodestarRegistry::list_services_page(env, 0, 20, None);
             assert_eq!(result.len(), 3);
             
             // Verify all have same reputation
@@ -313,22 +368,26 @@ mod test {
             setup_service(&env, 3, &provider, "compute", 0, true);
 
             // Test filtering by compute category
-            let compute_result = LodestarRegistry::list_services(
+            let compute_result = LodestarRegistry::list_services_page(
                 env.clone(),
+                0,
+                20,
                 Some(String::from_str(&env, "compute")),
             );
             assert_eq!(compute_result.len(), 2);
 
             // Test filtering by storage category
-            let storage_result = LodestarRegistry::list_services(
+            let storage_result = LodestarRegistry::list_services_page(
                 env.clone(),
+                0,
+                20,
                 Some(String::from_str(&env, "storage")),
             );
             assert_eq!(storage_result.len(), 1);
             assert_eq!(storage_result.get(0).unwrap().id, 2);
 
             // Test with no filter (should return all)
-            let all_result = LodestarRegistry::list_services(env, None);
+            let all_result = LodestarRegistry::list_services_page(env, 0, 20, None);
             assert_eq!(all_result.len(), 3);
         });
     }
@@ -346,7 +405,7 @@ mod test {
             setup_service(&env, 2, &provider, "compute", 0, false);
 
             // Test that only active service is returned
-            let result = LodestarRegistry::list_services(env, None);
+            let result = LodestarRegistry::list_services_page(env, 0, 20, None);
             assert_eq!(result.len(), 1);
             assert_eq!(result.get(0).unwrap().id, 1);
         });
@@ -366,8 +425,10 @@ mod test {
             setup_service(&env, 3, &provider, "storage", 1, true);
 
             // Test filtering by compute category with reputation sorting
-            let compute_result = LodestarRegistry::list_services(
+            let compute_result = LodestarRegistry::list_services_page(
                 env.clone(),
+                0,
+                20,
                 Some(String::from_str(&env, "compute")),
             );
             assert_eq!(compute_result.len(), 2);
@@ -388,8 +449,10 @@ mod test {
             setup_service(&env, 1, &provider, "compute", 0, true);
 
             // Test filtering by non-existent category
-            let result = LodestarRegistry::list_services(
+            let result = LodestarRegistry::list_services_page(
                 env.clone(),
+                0,
+                20,
                 Some(String::from_str(&env, "nonexistent")),
             );
             assert_eq!(result.len(), 0);

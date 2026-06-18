@@ -21,8 +21,6 @@ import { handleContractError } from '../lib/ContractError.js';
 
 const router = Router();
 
-router.use('/agents/:address', validateAgentAddressParam);
-
 function requireAgentsContract(_req, res, next) {
   if (!config.contract.agentsId) {
     return res.status(503).json({
@@ -81,6 +79,9 @@ router.get('/agents/stats', requireAgentsContract, async (_req, res) => {
     return handleContractError(err, res, 'Failed to fetch stats', 'FETCH_ERROR');
   }
 });
+
+// Param middleware for agent address routes
+router.use('/agents/:address', validateAgentAddressParam);
 
 // GET /api/agents/:address
 router.get('/agents/:address', requireAgentsContract, async (req, res) => {
