@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /registry
+Allow: /agents
+Disallow: /demo
+Disallow: /agents/register
+
+Sitemap: https://lodestar.app/sitemap.xml
