@@ -189,26 +189,32 @@ export async function getServiceCount() {
   }
 }
 
-export let activeServiceExists = async function (provider, endpoint) {
-  let page = 0;
-  const pageSize = 20;
+export const contractHelpers = {
+  activeServiceExists: async function (provider, endpoint) {
+    let page = 0;
+    const pageSize = 20;
 
-  while (true) {
-    const services = await listServices({ page, pageSize });
-    if (!services.length) {
-      return false;
+    while (true) {
+      const services = await listServices({ page, pageSize });
+      if (!services.length) {
+        return false;
+      }
+
+      if (services.some((s) => s.provider === provider && s.endpoint === endpoint)) {
+        return true;
+      }
+
+      if (services.length < pageSize) {
+        return false;
+      }
+
+      page += 1;
     }
+  },
+};
 
-    if (services.some((s) => s.provider === provider && s.endpoint === endpoint)) {
-      return true;
-    }
-
-    if (services.length < pageSize) {
-      return false;
-    }
-
-    page += 1;
-  }
+export async function activeServiceExists(provider, endpoint) {
+  return contractHelpers.activeServiceExists(provider, endpoint);
 }
 
 /**
@@ -223,12 +229,11 @@ export async function registerServiceOnChain(
   category
 ) {
   try {
-    const contract = getContract();
     const keypair = getServerKeypair();
     const providerAddress = Address.fromString(keypair.publicKey());
     const provider = providerAddress.toString();
 
-    if (await activeServiceExists(provider, endpoint)) {
+    if (await contractHelpers.activeServiceExists(provider, endpoint)) {
       const err = new Error(
         'Active service with same provider and endpoint already exists'
       );
@@ -236,6 +241,7 @@ export async function registerServiceOnChain(
       throw err;
     }
 
+    const contract = getContract();
     const op = contract.call(
       'register_service',
       nativeToScVal(providerAddress, { type: 'address' }),
