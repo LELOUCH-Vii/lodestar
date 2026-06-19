@@ -61,22 +61,21 @@ describe('activeServiceExists pagination', () => {
     const provider = 'GA7FYRB5CREWMDK2VIKVKWSW7V3YCCU3B3UHBJQ6JZ5OC7V7M5D4T8KJ';
     const endpoint = 'https://test.example.com';
 
-    const listServicesSpy = vi
-      .spyOn(contractLib, 'listServices')
+    const fetchServices = vi
+      .fn()
       .mockResolvedValueOnce([
         { provider: 'GAOTHER', endpoint: 'https://other.example.com' },
       ])
       .mockResolvedValueOnce([
         { provider, endpoint },
-      ])
-      .mockResolvedValueOnce([]);
+      ]);
 
     await expect(
-      contractLib.contractHelpers.activeServiceExists(provider, endpoint)
+      contractLib.contractHelpers.activeServiceExists(provider, endpoint, fetchServices)
     ).resolves.toBe(true);
 
-    expect(listServicesSpy).toHaveBeenNthCalledWith(1, { page: 0, pageSize: 20 });
-    expect(listServicesSpy).toHaveBeenNthCalledWith(2, { page: 1, pageSize: 20 });
+    expect(fetchServices).toHaveBeenNthCalledWith(1, { page: 0, pageSize: 20 });
+    expect(fetchServices).toHaveBeenNthCalledWith(2, { page: 1, pageSize: 20 });
   });
 });
 

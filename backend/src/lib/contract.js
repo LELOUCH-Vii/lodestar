@@ -190,12 +190,12 @@ export async function getServiceCount() {
 }
 
 export const contractHelpers = {
-  activeServiceExists: async function (provider, endpoint) {
+  activeServiceExists: async function (provider, endpoint, fetchServices = listServices) {
     let page = 0;
     const pageSize = 20;
 
     while (true) {
-      const services = await listServices({ page, pageSize });
+      const services = await fetchServices({ page, pageSize });
       if (!services.length) {
         return false;
       }
@@ -207,9 +207,10 @@ export const contractHelpers = {
       page += 1;
     }
   },
+};
 
-export async function activeServiceExists(provider, endpoint) {
-  return contractHelpers.activeServiceExists(provider, endpoint);
+export async function activeServiceExists(provider, endpoint, fetchServices = listServices) {
+  return contractHelpers.activeServiceExists(provider, endpoint, fetchServices);
 }
 
 /**
