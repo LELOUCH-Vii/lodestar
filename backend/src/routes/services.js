@@ -92,6 +92,7 @@ router.get('/weather', async (req, res) => {
       service: 'Lodestar Weather Service',
       amount: config.x402.weatherPrice,
       txHash,
+      ...(req.query.demoRunId && { demoRunId: String(req.query.demoRunId) }),
     });
 
     if (agentAddress && config.contract.agentsId) {
@@ -149,6 +150,7 @@ router.get('/search', async (req, res) => {
       service: 'Lodestar Search Service',
       amount: config.x402.searchPrice,
       txHash: searchTxHash,
+      ...(req.query.demoRunId && { demoRunId: String(req.query.demoRunId) }),
     });
 
     if (searchAgentAddress && config.contract.agentsId) {
