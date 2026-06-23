@@ -5,7 +5,7 @@ vi.mock('../config.js', () => ({
     contract: { id: 'mock', agentsId: 'mock' },
     server: { address: 'mock', secret: 'SDY7R6HC2UK4D4CWWBKZBJTE6FLY5QHGQCK2U6U3R3KASMW5OPWMBDO2' },
     stellar: { network: 'testnet', rpcUrl: 'https://mock', networkPassphrase: 'mock', usdcContractId: 'mock' },
-    x402: { facilitatorUrl: 'https://mock', searchPrice: '0.001', weatherPrice: '0.001' },
+    x402: { facilitatorUrl: 'https://mock', searchPrice: '0.001', weatherPrice: '0.001', payTo: 'G_MOCK_PAYMENT' },
     braveApiKey: '',
     corsOrigin: ['http://localhost:3000'],
     jsonBodyLimit: '100kb',
@@ -36,7 +36,7 @@ describe('registerServiceOnChain duplicate checks', () => {
     activeServiceExistsSpy.mockResolvedValueOnce(true);
 
     expect(await contractLib.activeServiceExists(provider, endpoint)).toBe(true);
-    expect(activeServiceExistsSpy).toHaveBeenCalledWith(provider, endpoint);
+    expect(activeServiceExistsSpy).toHaveBeenCalledWith(provider, endpoint, expect.any(Function));
   });
 
   it('returns false when no matching active service exists', async () => {

@@ -171,6 +171,7 @@ export async function listServices({ category, page = 0, pageSize = 20 } = {}) {
       description: item.description,
       endpoint: item.endpoint,
       price_usdc: item.price_usdc,
+      pay_to: item.pay_to,
       category: item.category,
       provider: item.provider?.toString() ?? item.provider,
       reputation: Number(item.reputation),
@@ -196,6 +197,7 @@ export async function getService(id) {
       description: native.description,
       endpoint: native.endpoint,
       price_usdc: native.price_usdc,
+      pay_to: native.pay_to,
       category: native.category,
       provider: native.provider?.toString() ?? native.provider,
       reputation: Number(native.reputation),
@@ -254,7 +256,8 @@ export async function registerServiceOnChain(
   description,
   endpoint,
   priceUsdc,
-  category
+  category,
+  payTo
 ) {
   try {
     const keypair = getServerKeypair();
@@ -270,6 +273,8 @@ export async function registerServiceOnChain(
     }
 
     const contract = getContract();
+    const payToAddress = payTo || config.x402.payTo;
+
     const op = contract.call(
       'register_service',
       nativeToScVal(providerAddress, { type: 'address' }),
@@ -277,6 +282,7 @@ export async function registerServiceOnChain(
       nativeToScVal(description, { type: 'string' }),
       nativeToScVal(endpoint, { type: 'string' }),
       nativeToScVal(priceUsdc, { type: 'string' }),
+      nativeToScVal(payToAddress, { type: 'string' }),
       nativeToScVal(category, { type: 'string' })
     );
 

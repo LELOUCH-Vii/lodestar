@@ -1,9 +1,10 @@
-import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import crypto from 'crypto';
 import express from 'express';
 import request from 'supertest';
 
 const mockListAgents = vi.fn();
+const mockListAgentsPage = vi.fn();
 const mockGetAgent = vi.fn();
 const mockGetAgentPolicy = vi.fn();
 const mockGetAgentScore = vi.fn();
@@ -14,6 +15,7 @@ const mockRecordPaymentOnChain = vi.fn();
 
 vi.mock('../lib/contract.js', () => ({
   listAgents: (...args) => mockListAgents(...args),
+  listAgentsPage: (...args) => mockListAgentsPage(...args),
   getAgent: (...args) => mockGetAgent(...args),
   getAgentPolicy: (...args) => mockGetAgentPolicy(...args),
   getAgentScore: (...args) => mockGetAgentScore(...args),
@@ -32,7 +34,7 @@ vi.mock('../config.js', () => ({
     contract: { agentsId: 'mock_agents_id' },
     server: { address: 'mock', secret: 'hmac_test_secret' },
     stellar: { network: 'testnet', rpcUrl: 'https://mock', networkPassphrase: 'mock', usdcContractId: 'mock' },
-    x402: { facilitatorUrl: 'https://mock', searchPrice: '0.001', weatherPrice: '0.001' },
+    x402: { facilitatorUrl: 'https://mock', searchPrice: '0.001', weatherPrice: '0.001', payTo: 'G_MOCK_PAYMENT' },
     braveApiKey: '',
     corsOrigin: ['http://localhost:3000'],
     jsonBodyLimit: '100kb',
@@ -85,11 +87,22 @@ function signBody(body) {
 
 let app;
 
+let testEpoch = 0;
+
 beforeAll(async () => {
   const router = (await import('./agents.js')).default;
   app = express();
   app.use(express.json());
   app.use('/api', router);
+});
+
+beforeEach(() => {
+  testEpoch += 100_000;
+  vi.spyOn(Date, 'now').mockReturnValue(testEpoch);
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
 });
 
 beforeEach(() => {
@@ -118,24 +131,25 @@ function makeAgent(overrides = {}) {
 }
 
 describe('GET /api/agents', () => {
-  it('should return list of agents', async () => {
-    const agents = [makeAgent({ address: 'GA1' }), makeAgent({ address: 'GA2' })];
-    mockListAgents.mockResolvedValueOnce(agents);
-
-    const res = await request(app).get('/api/agents');
-
-    expect(res.status).toBe(200);
-    expect(res.body.agents).toHaveLength(2);
-    expect(res.body.count).toBe(2);
-  });
-
   it('should return 500 when contract call fails', async () => {
-    mockListAgents.mockRejectedValueOnce(new Error('Chain error'));
+    mockGetAgentCount.mockRejectedValueOnce(new Error('Chain error'));
 
     const res = await request(app).get('/api/agents');
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Failed to fetch agents', code: 'FETCH_ERROR' });
+  });
+
+  it('should return list of agents', async () => {
+    const agents = [makeAgent({ address: 'GA1' }), makeAgent({ address: 'GA2' })];
+    mockGetAgentCount.mockResolvedValueOnce(2);
+    mockListAgentsPage.mockResolvedValueOnce(agents);
+
+    const res = await request(app).get('/api/agents');
+
+    expect(res.status).toBe(200);
+    expect(res.body.agents).toHaveLength(2);
+    expect(res.body.total).toBe(2);
   });
 });
 
@@ -151,28 +165,29 @@ describe('GET /api/agents/count', () => {
 });
 
 describe('GET /api/agents/stats', () => {
-  it('should return stats for agents', async () => {
-    const agents = [
-      makeAgent({ score: 100, total_volume_stroops: '10000000' }),
-      makeAgent({ score: 200, total_volume_stroops: '20000000' }),
-    ];
-    mockListAgents.mockResolvedValueOnce(agents);
-
-    const res = await request(app).get('/api/agents/stats');
-
-    expect(res.status).toBe(200);
-    expect(res.body.totalAgents).toBe(2);
-    expect(res.body.avgScore).toBe(150);
-  });
-
   it('should return zero stats when no agents', async () => {
-    mockListAgents.mockResolvedValueOnce([]);
+    mockGetAgentCount.mockResolvedValueOnce(0);
 
     const res = await request(app).get('/api/agents/stats');
 
     expect(res.status).toBe(200);
     expect(res.body.totalAgents).toBe(0);
     expect(res.body.avgScore).toBe(0);
+  });
+
+  it('should return stats for agents', async () => {
+    const agents = [
+      makeAgent({ score: 100, total_volume_stroops: '10000000' }),
+      makeAgent({ score: 200, total_volume_stroops: '20000000' }),
+    ];
+    mockGetAgentCount.mockResolvedValueOnce(2);
+    mockListAgentsPage.mockResolvedValueOnce(agents);
+
+    const res = await request(app).get('/api/agents/stats');
+
+    expect(res.status).toBe(200);
+    expect(res.body.totalAgents).toBe(2);
+    expect(res.body.avgScore).toBe(150);
   });
 });
 

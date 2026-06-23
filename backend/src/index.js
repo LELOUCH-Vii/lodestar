@@ -68,6 +68,11 @@ app.use((err, _req, res, _next) => {
   });
 });
 
+logger.info(
+  { paymentAddress: config.x402.payTo },
+  "Payment address configured",
+);
+
 app.listen(config.port, () => {
   logger.info(
     {
