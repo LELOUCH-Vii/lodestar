@@ -44,8 +44,6 @@ const paymentConfig = {
       price: `$${config.x402.searchPrice}`,
       network: config.stellar.networkId,
       payTo: config.server.address,
-      network: 'stellar:testnet',
-      payTo: config.x402.payTo,
     },
     description: 'Web search results via Lodestar',
   },
