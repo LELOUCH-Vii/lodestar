@@ -515,13 +515,20 @@ export default function AgentProfilePage() {
     );
   }
 
+  const totalPayments = Number(agent.total_payments);
+  const successfulPayments = Number(agent.successful_payments);
+  const failedPayments = Number(agent.failed_payments);
+
   const successRate =
-    agent.total_payments > 0
-      ? Math.round((agent.successful_payments / agent.total_payments) * 100)
+    totalPayments > 0
+      ? Math.round((successfulPayments / totalPayments) * 100)
       : null;
 
   const tier = scoreTier(agent.score);
-  const totalVolumeUsdc = (Number(BigInt(agent.total_volume_stroops)) / 10_000_000).toFixed(4);
+  const totalVolumeStroops = BigInt(agent.total_volume_stroops);
+  const usdcWhole = totalVolumeStroops / 10_000_000n;
+  const usdcCents = totalVolumeStroops % 10_000_000n;
+  const totalVolumeUsdc = `${usdcWhole}.${String(usdcCents).padStart(7, '0').slice(0, 4)}`;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -606,16 +613,16 @@ export default function AgentProfilePage() {
 
         {/* Stats grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total payments" value={agent.total_payments.toLocaleString()} />
+          <StatCard label="Total payments" value={totalPayments.toLocaleString()} />
           <StatCard
             label="Successful"
-            value={agent.successful_payments.toLocaleString()}
+            value={successfulPayments.toLocaleString()}
             color="success"
           />
           <StatCard
             label="Failed"
-            value={agent.failed_payments.toLocaleString()}
-            color={agent.failed_payments > 0 ? 'error' : undefined}
+            value={failedPayments.toLocaleString()}
+            color={failedPayments > 0 ? 'error' : undefined}
           />
           <StatCard
             label="Success rate"
@@ -698,8 +705,8 @@ export default function AgentProfilePage() {
       <div className="card p-5 flex flex-wrap gap-6">
         <MetaItem label="Tier" value={TIER_LABELS[tier]} />
         <MetaItem label="Total volume" value={`$${totalVolumeUsdc} USDC`} />
-        <MetaItem label="Registered at ledger" value={`#${agent.registered_at.toLocaleString()}`} />
-        <MetaItem label="Last active at ledger" value={`#${agent.last_active.toLocaleString()}`} />
+        <MetaItem label="Registered at ledger" value={`#${Number(agent.registered_at).toLocaleString()}`} />
+        <MetaItem label="Last active at ledger" value={`#${Number(agent.last_active).toLocaleString()}`} />
         <MetaItem label="Owner" value={`${agent.owner.slice(0, 6)}…${agent.owner.slice(-4)}`} mono />
       </div>
     </div>

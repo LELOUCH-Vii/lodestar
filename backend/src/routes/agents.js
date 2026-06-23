@@ -66,8 +66,8 @@ async function getCachedAgents() {
 function sortAgents(agents, sort) {
   return [...agents].sort((a, b) => {
     if (sort === 'score') return b.score - a.score;
-    if (sort === 'payments') return b.total_payments - a.total_payments;
-    return b.registered_at - a.registered_at;
+    if (sort === 'payments') return Number(b.total_payments) - Number(a.total_payments);
+    return Number(b.registered_at) - Number(a.registered_at);
   });
 }
 
@@ -122,7 +122,7 @@ router.get('/agents/stats', requireAgentsContract, async (_req, res) => {
     const totalAgents = agents.length;
 
     if (totalAgents === 0) {
-      return res.json({ totalAgents: 0, avgScore: 0, topAgent: null, totalVolume: '0' });
+      return res.json({ totalAgents: 0, avgScore: 0, topAgent: null, totalVolume: '0', totalVolumeStroops: '0' });
     }
 
     const avgScore = Math.round(agents.reduce((sum, a) => sum + a.score, 0) / totalAgents);
@@ -132,9 +132,11 @@ router.get('/agents/stats', requireAgentsContract, async (_req, res) => {
       (sum, a) => sum + BigInt(a.total_volume_stroops),
       0n
     );
-    const totalVolumeUsdc = (Number(totalVolumeStroops) / 10_000_000).toFixed(2);
+    const usdcWhole = totalVolumeStroops / 10_000_000n;
+    const usdcCents = totalVolumeStroops % 10_000_000n;
+    const totalVolume = `${usdcWhole}.${String(usdcCents).padStart(7, '0').slice(0, 2)}`;
 
-    res.json({ totalAgents, avgScore, topAgent, totalVolume: totalVolumeUsdc });
+    res.json({ totalAgents, avgScore, topAgent, totalVolume, totalVolumeStroops: totalVolumeStroops.toString() });
   } catch (err) {
     logger.error({ err }, 'GET /api/agents/stats failed');
     return handleContractError(err, res, 'Failed to fetch stats', 'FETCH_ERROR');

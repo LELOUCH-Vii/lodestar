@@ -103,7 +103,7 @@ describe('mapAgent', () => {
     expect(result.address).toBe(raw.address);
     expect(result.name).toBe('Test Agent');
     expect(result.score).toBe(100);
-    expect(result.total_payments).toBe(5);
+    expect(result.total_payments).toBe('5');
     expect(result.total_volume_stroops).toBe('10000000');
     expect(result.active).toBe(true);
     expect(result.flagged).toBe(false);
@@ -130,10 +130,10 @@ describe('mapAgent', () => {
     const result = mapAgent(raw);
 
     expect(result.score).toBe(0);
-    expect(result.total_payments).toBe(0);
+    expect(result.total_payments).toBe('0');
     expect(result.total_volume_stroops).toBe('0');
-    expect(result.registered_at).toBe(0);
-    expect(result.last_active).toBe(0);
+    expect(result.registered_at).toBe('0');
+    expect(result.last_active).toBe('0');
   });
 
   it('should handle values at Number.MAX_SAFE_INTEGER', () => {
@@ -158,10 +158,10 @@ describe('mapAgent', () => {
     const result = mapAgent(raw);
 
     expect(result.score).toBe(Number.MAX_SAFE_INTEGER);
-    expect(result.total_payments).toBe(Number.MAX_SAFE_INTEGER);
+    expect(result.total_payments).toBe(String(Number.MAX_SAFE_INTEGER));
     expect(result.total_volume_stroops).toBe(String(Number.MAX_SAFE_INTEGER));
-    expect(result.registered_at).toBe(Number.MAX_SAFE_INTEGER);
-    expect(result.last_active).toBe(Number.MAX_SAFE_INTEGER);
+    expect(result.registered_at).toBe(String(Number.MAX_SAFE_INTEGER));
+    expect(result.last_active).toBe(String(Number.MAX_SAFE_INTEGER));
   });
 
   it('should handle values exceeding Number.MAX_SAFE_INTEGER', () => {
@@ -215,7 +215,7 @@ describe('mapAgent', () => {
     const result = mapAgent(raw);
 
     expect(result.score).toBe(-50);
-    expect(result.total_payments).toBe(10);
+    expect(result.total_payments).toBe('10');
   });
 
   it('should handle values at Number.MIN_SAFE_INTEGER', () => {
@@ -311,7 +311,7 @@ describe('mapPolicy', () => {
     expect(result.allowed_categories).toEqual(['weather', 'search']);
     expect(result.min_score_to_earn).toBe(300);
     expect(result.daily_spent_stroops).toBe('0');
-    expect(result.last_reset_ledger).toBe(12345);
+    expect(result.last_reset_ledger).toBe('12345');
   });
 
   it('should handle zero values', () => {
@@ -332,7 +332,7 @@ describe('mapPolicy', () => {
     expect(result.allowed_categories).toEqual([]);
     expect(result.min_score_to_earn).toBe(0);
     expect(result.daily_spent_stroops).toBe('0');
-    expect(result.last_reset_ledger).toBe(0);
+    expect(result.last_reset_ledger).toBe('0');
   });
 
   it('should handle values at Number.MAX_SAFE_INTEGER', () => {
@@ -353,7 +353,7 @@ describe('mapPolicy', () => {
     expect(result.max_per_day_stroops).toBe(String(Number.MAX_SAFE_INTEGER));
     expect(result.min_score_to_earn).toBe(Number.MAX_SAFE_INTEGER);
     expect(result.daily_spent_stroops).toBe(String(Number.MAX_SAFE_INTEGER));
-    expect(result.last_reset_ledger).toBe(Number.MAX_SAFE_INTEGER);
+    expect(result.last_reset_ledger).toBe(String(Number.MAX_SAFE_INTEGER));
   });
 
   it('should handle values exceeding Number.MAX_SAFE_INTEGER', () => {
